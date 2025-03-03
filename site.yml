@@ -8,6 +8,23 @@
     yum:
      update_only: yes
      update_cache: yes
+
+- hosts: workstations
+  become: true
+  tasks:
+
+  - name: install unzip
+    package:
+      name: unzip
+
+  - name: install terraform
+    unarchive:
+      src: https://releases.hashicorp.com/terraform/0.12.28/terraform_0.12.28_linux_amd64.zip 
+      dest: /usr/local/bin
+      remote_src: yes
+      mode: 0755
+      owner: root
+      group: root
    
 
 - hosts: web_servers
@@ -20,6 +37,29 @@
        - httpd 
        - php 
       state: latest
+
+  - name: start httpd
+    tags: apache,centos,httpd
+    service:
+       name: httpd
+       state: started
+       enabled: yes
+
+  - name: change email address for admin
+    tags: apache,centos,httpd
+    lineinfile:
+        path: /etc/httpd/conf/httpd.conf
+        regexp: '^ServerAdmin'
+        line: ServerAdmin somebody@somewhere.net
+    register: httpd
+
+  - name: restart httpd
+    tags: apache,centos,httpd
+    service:
+      name: httpd
+      state: restarted
+    when: httpd.changed
+
 
   - name: copy default html file for site
     tags: apache,apache2,httpd
@@ -38,3 +78,31 @@
     yum:
       name: mariadb
       state: latest
+
+
+- hosts: all
+  become: true
+  tasks:
+
+  - name: create simone user
+    tags: always
+    user:
+      name: simone
+      groups: root
+
+  - name: add ssh key for simone
+    tags: always
+    authorized_key:
+      user: simone
+      key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIM8i2Kpc4lbc6S8PTmqMQGNKFxD+jc37Nt/W4dK4b6v9 ansible default"
+
+  - name: add sudoers file for simone
+    tags: always
+    copy:
+      src: sudoers_simone
+      dest: /etc/sudoers.d/simone
+      owner: root
+      group: root
+      mode: 0440
+
+
